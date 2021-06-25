@@ -1,0 +1,73 @@
+name: Automatically publish
+on:
+  # Triggers the workflow on push or pull request events but only for the main branch
+  push:
+    branches: [main]
+    paths:
+      - "VERSION"
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  releaseThisVersion:
+    runs-on: ubuntu-latest
+    if: ! contains( ${{ github.event.repository.name }} ,'template')
+
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@master
+
+      - name: Read VERSION
+        id: version
+        uses: juliangruber/read-file-action@v1
+        with:
+          path: VERSION
+          trim: True
+
+      - name: Set filename
+        env:
+          ZIPNAME: ${{ github.event.repository.name }}.${{ github.event.repository.updated_at }}.v${{ steps.version.outputs.content }}.zip
+          SP_ZIPNAME: ${{ github.event.repository.name }}.zip
+          SP_FOLDER: /Shared Documents/releases/${{ github.event.repository.name }}/v${{ steps.version.outputs.content }}
+          GH_CONTEXT: ${{ toJSON(github) }}
+          GH_CONTEXT_FILE: v${{ steps.version.outputs.content }}.json
+        run: |
+          echo "ZIPNAME=$(echo $ZIPNAME | sed s/://g)" >> $GITHUB_ENV
+          echo "SP_ZIPNAME=$SP_ZIPNAME" >> $GITHUB_ENV
+          echo "SP_FOLDER=$SP_FOLDER" >> $GITHUB_ENV
+          echo "$GH_CONTEXT" > $GH_CONTEXT_FILE
+      - name: Check tag
+        uses: mukunku/tag-exists-action@v1.0.0
+        id: checkTag
+        with:
+          tag: "${{ steps.version.outputs.content }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete the tag (if it exists)
+        if: contains(steps.checkTag.outputs.exists,'true')
+        uses: author/action-rollback@stable
+        with:
+          tag: ${{ steps.version.outputs.content }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Zip Folder
+        run: zip -r ${{ env.ZIPNAME }} . -x *.git*
+
+      - name: Upload Release
+        uses: cb80/pubrel@latest
+        with:
+          ref: "refs/tags/${{ steps.version.outputs.content }}"
+          replace: "${{ steps.version.outputs.content }}"
+          files: ${{ env.ZIPNAME }}
+
+      - name: SharePoint uploader
+        uses: su-dont/share-point-uploader@v2.1
+        with:
+          sp_url: ${{ secrets.SP_URL }}
+          sp_username: ${{ secrets.SP_USERNAME }}
+          sp_password: ${{ secrets.SP_PASSWORD }}
+          sp_folder: ${{ env.SP_FOLDER }}
+          sp_file_name: ${{ env.SP_ZIPNAME }}
+          file: ${{ env.ZIPNAME }}
