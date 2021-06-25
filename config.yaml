@@ -1,2 +1,5 @@
 APP:
-  DEBUG: True
+    DEBUG: true
+    FOLDER_START: D:\onedrive\
+    DATABASE_PATH: duplicatefile.db
+    DELETE_PRIOR: true

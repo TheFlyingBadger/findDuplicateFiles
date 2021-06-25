@@ -6,6 +6,7 @@ name = "pypi"
 [packages]
 icecream = "*"
 configfilehelper = "*"
+find-duplicate-files = "*"
 
 [dev-packages]
 autopep8 = "*"
